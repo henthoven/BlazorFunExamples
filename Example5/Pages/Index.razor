@@ -1,0 +1,95 @@
+﻿@page "/"
+
+@inject IJSRuntime JsRuntime;
+
+<h1>Example 5 - Sprites</h1>
+<div id="canvasContainer" @onkeyup="OnKeyUp">
+    <BECanvas @ref="_canvasReference" Width="800" Height="600" ></BECanvas>
+</div>
+
+<img  @ref="_demoSprites" src="Images/BlazorFunPiskelDemo.png" hidden/>
+
+@code {
+    BECanvasComponent _canvasReference = null;
+    Canvas2DContext _canvasContext = null;
+    ElementReference _demoSprites;
+
+    // position and speed variables
+    int _xPosition = 100;
+    int _yPosition = 100;
+    int _xSpeed = 2;
+    int _ySpeed = 2;
+
+    // needed to calculate fps
+    float _lastTimestamp;
+    float _fps;
+
+    /// <summary>
+    /// Initialized the canvasses and creates the SnakeGame
+    /// </summary>
+    /// <param name="firstRender">Flag that identifies if this is the first render</param>
+    /// <returns>A completed task</returns>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+            return;
+
+        _canvasContext = await _canvasReference.CreateCanvas2DAsync();
+
+        await JsRuntime.InvokeAsync<object>("initGame", DotNetObjectReference.Create(this));
+    }
+
+    /// <summary>
+    /// This method will be called 60 times per second by the requestanimationframe from javascript.
+    /// </summary>
+    /// <param name="timeStamp">The current timestamp</param>
+    /// <param name="width">The width of the canvas</param>
+    /// <param name="height">The height of the canvas</param>
+    /// <returns>A completed task</returns>
+    [JSInvokable]
+    public async ValueTask GameLoop(float timeStamp, int width, int height)
+    {
+        await _canvasContext.BeginBatchAsync();
+        await _canvasContext.ClearRectAsync(0, 0, width, height);
+        await _canvasContext.SetFillStyleAsync("lightblue");
+        await _canvasContext.FillRectAsync(0, 0, width, height);
+
+        await _canvasContext.DrawImageAsync(_demoSprites, 0, 0, 32, 32, _xPosition, _yPosition, 32, 32);
+        await _canvasContext.DrawImageAsync(_demoSprites, 32, 0, 32, 32, 100, 100, 32, 32);
+
+        await _canvasContext.SetFillStyleAsync("black");
+        await _canvasContext.SetFontAsync("20px Comic Sans MS");
+        await _canvasContext.FillTextAsync($"FPS: {(int)_fps}", 10, 50);
+
+
+        await _canvasContext.EndBatchAsync();
+
+        // update positions
+        _xPosition += _xSpeed;
+        _yPosition += _ySpeed;
+
+        if (_xPosition > width || _xPosition < 0)
+            _xSpeed *= -1;
+
+        if (_yPosition > height || _yPosition < 0)
+            _ySpeed *= -1;
+
+        // calculate fps
+        _fps = 1000 / (timeStamp - _lastTimestamp);
+        _lastTimestamp = timeStamp;
+    }
+
+    private void OnKeyUp(KeyboardEventArgs args)
+    {
+        Console.WriteLine($"Key pressed: {args.Code}");
+        if (args.Code == "ArrowUp")
+            _ySpeed = -2;
+        else if (args.Code == "ArrowDown")
+            _ySpeed = 2;
+        else if (args.Code == "ArrowRight")
+            _xSpeed = 2;
+        else if (args.Code == "ArrowLeft")
+            _xSpeed = -2;
+    }
+
+}
